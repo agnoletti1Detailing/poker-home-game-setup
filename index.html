@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poker Chip Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-green-800 to-green-900 min-h-screen p-4">
+    <div class="max-w-4xl mx-auto px-2">
+        <div class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-white mb-2">🃏 Poker Chip Calculator</h1>
+            <p class="text-green-200 text-sm md:text-base px-2">Enter your buy-in to get optimal chip denominations (100 BB structure)</p>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-2xl p-4 md:p-8 mb-6 md:mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
+                <div>
+                    <label class="block text-gray-700 text-base md:text-lg font-semibold mb-3 md:mb-4">Buy-in Amount</label>
+                    <div class="relative">
+                        <span class="absolute left-3 md:left-4 top-1/2 transform -translate-y-1/2 text-gray-500 text-lg md:text-xl">$</span>
+                        <input 
+                            type="number" 
+                            id="buyinInput" 
+                            placeholder="100" 
+                            class="w-full pl-7 md:pl-8 pr-3 md:pr-4 py-3 md:py-4 text-lg md:text-xl border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
+                            oninput="calculateChips()"
+                        >
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 text-base md:text-lg font-semibold mb-3 md:mb-4">Number of Players</label>
+                    <input 
+                        type="number" 
+                        id="playersInput" 
+                        value="6" 
+                        min="2" 
+                        max="10"
+                        class="w-full px-3 md:px-4 py-3 md:py-4 text-lg md:text-xl border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
+                        oninput="calculateChips()"
+                    >
+                </div>
+            </div>
+        </div>
+
+        <div id="results" class="hidden">
+            <div class="bg-white rounded-xl shadow-2xl p-4 md:p-8 mb-4 md:mb-6">
+                <h2 class="text-xl md:text-2xl font-bold text-gray-800 mb-4 md:mb-6">Blinds Structure</h2>
+                <div class="grid grid-cols-2 md:grid-cols-2 gap-3 md:gap-6">
+                    <div class="bg-blue-50 p-4 md:p-6 rounded-lg">
+                        <h3 class="text-sm md:text-lg font-semibold text-blue-800 mb-1 md:mb-2">Small Blind</h3>
+                        <p class="text-xl md:text-3xl font-bold text-blue-600" id="smallBlind">$0.50</p>
+                    </div>
+                    <div class="bg-red-50 p-4 md:p-6 rounded-lg">
+                        <h3 class="text-sm md:text-lg font-semibold text-red-800 mb-1 md:mb-2">Big Blind</h3>
+                        <p class="text-xl md:text-3xl font-bold text-red-600" id="bigBlind">$1.00</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-2xl p-4 md:p-8">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6">
+                    <h2 class="text-xl md:text-2xl font-bold text-gray-800 mb-2 md:mb-0">Chip Distribution Per Player</h2>
+                    <button 
+                        id="toggleInventory" 
+                        onclick="toggleInventoryMode()"
+                        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                    >
+                        📦 Manage Inventory
+                    </button>
+                </div>
+                
+                <div id="inventoryPanel" class="hidden mb-6 p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+                    <h3 class="text-lg font-semibold text-blue-800 mb-4">Available Chip Inventory</h3>
+                    <div id="inventoryControls" class="grid gap-4">
+                        <!-- Inventory controls will be inserted here -->
+                    </div>
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        <button onclick="resetInventory()" class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm">Reset to Optimal</button>
+                        <button onclick="applyInventoryLimits()" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm">Apply Limits</button>
+                    </div>
+                </div>
+                
+                <div id="chipBreakdown" class="grid gap-4">
+                    <!-- Chip breakdown will be inserted here -->
+                </div>
+                
+                <div class="mt-6 md:mt-8 p-4 md:p-6 bg-gray-50 rounded-lg">
+                    <h3 class="text-base md:text-lg font-semibold text-gray-800 mb-3 md:mb-4">Total Chips Needed</h3>
+                    <div id="totalChips" class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                        <!-- Total chips will be inserted here -->
+                    </div>
+                    <div id="inventoryWarning" class="hidden mt-4 p-3 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700">
+                        <p class="font-semibold">⚠️ Inventory Limitation Active</p>
+                        <p class="text-sm">Distribution adjusted based on available chips. Some denominations may be limited.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let inventoryMode = false;
+        let chipInventory = {};
+        let originalChips = [];
+        
+        function calculateChips() {
+            const buyinInput = document.getElementById('buyinInput');
+            const playersInput = document.getElementById('playersInput');
+            const results = document.getElementById('results');
+            
+            const buyin = parseFloat(buyinInput.value);
+            const players = parseInt(playersInput.value);
+            
+            if (!buyin || buyin <= 0 || !players || players < 2) {
+                results.classList.add('hidden');
+                return;
+            }
+            
+            // Calculate blinds (100 BB structure)
+            const bigBlind = buyin / 100;
+            const smallBlind = bigBlind / 2;
+            
+            // Update blinds display
+            document.getElementById('smallBlind').textContent = `$${smallBlind.toFixed(2)}`;
+            document.getElementById('bigBlind').textContent = `$${bigBlind.toFixed(2)}`;
+            
+            // Calculate optimal chip denominations
+            let chipDenominations = calculateOptimalChips(buyin);
+            originalChips = [...chipDenominations];
+            
+            // Apply inventory limits if in inventory mode
+            if (inventoryMode && Object.keys(chipInventory).length > 0) {
+                chipDenominations = applyInventoryConstraints(chipDenominations, buyin);
+            }
+            
+            // Display chip breakdown per player
+            displayChipBreakdown(chipDenominations, buyin);
+            
+            // Display total chips needed
+            displayTotalChips(chipDenominations, players);
+            
+            // Update inventory controls
+            if (inventoryMode) {
+                displayInventoryControls(originalChips);
+            }
+            
+            results.classList.remove('hidden');
+        }
+        
+        function toggleInventoryMode() {
+            inventoryMode = !inventoryMode;
+            const panel = document.getElementById('inventoryPanel');
+            const button = document.getElementById('toggleInventory');
+            const warning = document.getElementById('inventoryWarning');
+            
+            if (inventoryMode) {
+                panel.classList.remove('hidden');
+                button.textContent = '📊 Back to Optimal';
+                button.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+                button.classList.add('bg-gray-500', 'hover:bg-gray-600');
+                displayInventoryControls(originalChips);
+            } else {
+                panel.classList.add('hidden');
+                warning.classList.add('hidden');
+                button.textContent = '📦 Manage Inventory';
+                button.classList.remove('bg-gray-500', 'hover:bg-gray-600');
+                button.classList.add('bg-blue-500', 'hover:bg-blue-600');
+                chipInventory = {};
+                calculateChips();
+            }
+        }
+        
+        function displayInventoryControls(chips) {
+            const container = document.getElementById('inventoryControls');
+            const colors = ['bg-white border-gray-400', 'bg-red-100 border-red-400', 'bg-green-100 border-green-400', 'bg-blue-100 border-blue-400', 'bg-purple-100 border-purple-400'];
+            
+            container.innerHTML = chips.map((chip, index) => `
+                <div class="flex items-center justify-between p-3 ${colors[index]} border-2 rounded-lg">
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 ${colors[index]} border-2 border-gray-600 rounded-full flex items-center justify-center font-bold text-xs mr-3">
+                            $${chip.value < 1 ? (chip.value * 100) + '¢' : chip.value}
+                        </div>
+                        <div>
+                            <p class="font-semibold text-sm">$${chip.value.toFixed(2)} chips</p>
+                            <p class="text-xs text-gray-600">Optimal: ${chip.quantity * parseInt(document.getElementById('playersInput').value)}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm font-medium">Available:</label>
+                        <input 
+                            type="number" 
+                            min="0" 
+                            value="${chipInventory[chip.value] || chip.quantity * parseInt(document.getElementById('playersInput').value)}"
+                            class="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                            onchange="updateInventory(${chip.value}, this.value)"
+                        >
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function updateInventory(chipValue, quantity) {
+            chipInventory[chipValue] = parseInt(quantity) || 0;
+        }
+        
+        function resetInventory() {
+            chipInventory = {};
+            calculateChips();
+        }
+        
+        function applyInventoryLimits() {
+            calculateChips();
+        }
+        
+        function applyInventoryConstraints(chips, buyin) {
+            const players = parseInt(document.getElementById('playersInput').value);
+            const warning = document.getElementById('inventoryWarning');
+            let hasLimitations = false;
+            
+            // Apply inventory constraints
+            const constrainedChips = chips.map(chip => {
+                const available = chipInventory[chip.value] || (chip.quantity * players);
+                const perPlayer = Math.floor(available / players);
+                
+                if (perPlayer < chip.quantity) {
+                    hasLimitations = true;
+                }
+                
+                return {
+                    ...chip,
+                    quantity: perPlayer,
+                    total: chip.value * perPlayer,
+                    limited: perPlayer < chip.quantity
+                };
+            }).filter(chip => chip.quantity > 0);
+            
+            // Calculate shortfall and redistribute
+            const totalValue = constrainedChips.reduce((sum, chip) => sum + chip.total, 0);
+            const shortfall = buyin - totalValue;
+            
+            if (shortfall > 0) {
+                // Try to make up shortfall with available chips
+                for (let i = constrainedChips.length - 1; i >= 0 && shortfall > 0; i--) {
+                    const chip = constrainedChips[i];
+                    const available = chipInventory[chip.value] || (originalChips.find(c => c.value === chip.value)?.quantity * players || 0);
+                    const currentUsed = chip.quantity * players;
+                    const canAdd = Math.floor((available - currentUsed) / players);
+                    const shouldAdd = Math.min(canAdd, Math.floor(shortfall / chip.value));
+                    
+                    if (shouldAdd > 0) {
+                        chip.quantity += shouldAdd;
+                        chip.total = chip.value * chip.quantity;
+                    }
+                }
+            }
+            
+            // Show/hide warning
+            if (hasLimitations) {
+                warning.classList.remove('hidden');
+            } else {
+                warning.classList.add('hidden');
+            }
+            
+            return constrainedChips;
+        }
+        
+        function calculateOptimalChips(buyin) {
+            const chips = [];
+            
+            // Calculate blinds first
+            const bigBlind = buyin / 100;
+            const smallBlind = bigBlind / 2;
+            
+            // Determine base denomination that can pay the small blind exactly
+            let baseDenom;
+            if (smallBlind >= 25) baseDenom = 25;
+            else if (smallBlind >= 5) baseDenom = 5;
+            else if (smallBlind >= 2.5) baseDenom = 2.5;
+            else if (smallBlind >= 1) baseDenom = 1;
+            else if (smallBlind >= 0.5) baseDenom = 0.5;
+            else if (smallBlind >= 0.25) baseDenom = 0.25;
+            else if (smallBlind >= 0.1) baseDenom = 0.1;
+            else baseDenom = 0.05;
+            
+            // Ensure base denomination divides evenly into small blind
+            while (smallBlind % baseDenom !== 0 && baseDenom > 0.01) {
+                baseDenom = baseDenom / 2;
+            }
+            
+            // Create 4-5 denominations with good ratios
+            const denominations = [
+                baseDenom,
+                baseDenom * 5,
+                baseDenom * 25,
+                baseDenom * 100
+            ];
+            
+            // Add a higher denomination if needed
+            if (buyin > denominations[3] * 20) {
+                denominations.push(baseDenom * 500);
+            }
+            
+            // Calculate quantities for each denomination
+            let remaining = buyin;
+            
+            for (let i = denominations.length - 1; i >= 0; i--) {
+                const denom = denominations[i];
+                let quantity = 0;
+                
+                if (i === denominations.length - 1) {
+                    // Highest denomination: use sparingly
+                    quantity = Math.floor(remaining / denom * 0.4);
+                } else if (i === denominations.length - 2) {
+                    // Second highest: main workhorse
+                    quantity = Math.floor(remaining / denom * 0.6);
+                } else if (i === 1) {
+                    // Medium denomination: for betting
+                    quantity = Math.max(8, Math.floor(remaining / denom * 0.3));
+                } else {
+                    // Smallest denomination: for blinds and change
+                    quantity = Math.max(10, Math.floor(remaining / denom));
+                }
+                
+                if (quantity > 0) {
+                    chips.push({
+                        value: denom,
+                        quantity: quantity,
+                        total: denom * quantity
+                    });
+                    remaining -= denom * quantity;
+                }
+            }
+            
+            return chips;
+        }
+        
+        function displayChipBreakdown(chips, buyin) {
+            const container = document.getElementById('chipBreakdown');
+            const colors = ['bg-white border-gray-400', 'bg-red-100 border-red-400', 'bg-green-100 border-green-400', 'bg-blue-100 border-blue-400', 'bg-purple-100 border-purple-400'];
+            
+            container.innerHTML = chips.map((chip, index) => `
+                <div class="flex items-center justify-between p-3 md:p-4 ${colors[index]} border-2 rounded-lg ${chip.limited ? 'ring-2 ring-yellow-400' : ''}">
+                    <div class="flex items-center">
+                        <div class="w-10 h-10 md:w-12 md:h-12 ${colors[index]} border-2 border-gray-600 rounded-full flex items-center justify-center font-bold text-xs md:text-sm mr-3 md:mr-4">
+                            $${chip.value < 1 ? (chip.value * 100) + '¢' : chip.value}
+                        </div>
+                        <div>
+                            <p class="font-semibold text-sm md:text-base">$${chip.value.toFixed(2)} chips</p>
+                            <p class="text-xs md:text-sm text-gray-600">
+                                ${chip.quantity} chips
+                                ${chip.limited ? ' ⚠️ Limited' : ''}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-bold text-base md:text-lg">$${chip.total.toFixed(2)}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function displayTotalChips(chips, players) {
+            const container = document.getElementById('totalChips');
+            const colors = ['bg-white border-gray-400', 'bg-red-100 border-red-400', 'bg-green-100 border-green-400', 'bg-blue-100 border-blue-400', 'bg-purple-100 border-purple-400'];
+            
+            container.innerHTML = chips.map((chip, index) => `
+                <div class="text-center p-3 md:p-4 ${colors[index]} border-2 rounded-lg">
+                    <div class="w-8 h-8 md:w-10 md:h-10 ${colors[index]} border-2 border-gray-600 rounded-full flex items-center justify-center font-bold text-xs mx-auto mb-2">
+                        $${chip.value < 1 ? (chip.value * 100) + '¢' : chip.value}
+                    </div>
+                    <p class="font-semibold text-xs md:text-sm">$${chip.value.toFixed(2)}</p>
+                    <p class="font-bold text-base md:text-lg">${chip.quantity * players}</p>
+                    <p class="text-xs text-gray-600">total needed</p>
+                </div>
+            `).join('');
+        }
+        
+        // Initialize with default values
+        document.getElementById('buyinInput').value = '100';
+        calculateChips();
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96c47b96362b158a',t:'MTc1NDcxMzQ1NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
